@@ -112,5 +112,3 @@ while True:
 #### `ipc:///tmp/ether.signals.xsub :: XSUB`
 
 Принимает сигналы для других модулей.
-
-Пример отправки сигналов в Transnet можно посмотреть в [спецификации](transnet_signal_api.md).

@@ -8,22 +8,9 @@ export function loadComponents() {
     }
   }
 
-  const custom_modules = import.meta.glob("../../../plugins/serviz/*.ts", {
-    eager: true,
-  });
-  const custom_result: Component[] = [];
-  console.log("Found custom components:", custom_modules);
-  for (const path in custom_modules) {
-    const mod: any = custom_modules[path];
-    if (mod.default) {
-      custom_result.push(mod.default);
-    }
-  }
-
   result.sort((a, b) => (a.menuOrder ?? 0) - (b.menuOrder ?? 0));
-  custom_result.sort((a, b) => (a.menuOrder ?? 0) - (b.menuOrder ?? 0));
 
-  return [result, custom_result];
+  return result;
 }
 
 interface Component {
