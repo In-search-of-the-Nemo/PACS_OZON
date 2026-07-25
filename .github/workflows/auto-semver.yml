@@ -8,6 +8,8 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -40,14 +42,13 @@ jobs:
       - name: "Commit changes"
         run: |
           git add README.md
-          git pull > /dev/null 2>&1
-          git commit --amend --no-edit > /dev/null 2>&1
-          git push origin -f > /dev/null 2>&1
+          git commit --amend --no-edit
+          git push origin -f
 
       - name: "Bump tag"
         run: |
           tag_semver=${{ steps.version.outputs.semver }}
           tag_message=$(git log -1 --pretty=%B)
           git tag -a "${tag_semver}" -m "${tag_message}"
-          git push origin "${tag_semver}" >/dev/null 2>&1
+          git push origin "${tag_semver}"
 
