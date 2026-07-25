@@ -1,7 +1,7 @@
 name: CI smoke (build + up)
 
 on:
-  pull_request:
+  push:
   workflow_dispatch:
 
 jobs:
@@ -69,10 +69,25 @@ jobs:
             exit 1
           fi
 
+      # Поднимаем стек в фоне и проверяем, что сообщения из examples/send_status.py
+      # доходят до фронта: тест подключается к backend тем же Socket.IO, что и браузер,
+      # и ждёт события 'status' и 'update_telemetry', которые слушают компоненты.
+      - name: E2E test (example -> frontend)
+        shell: bash
+        run: |
+          . venv/bin/activate
+          pip install -q -r requirements-dev.txt
+          honcho start > e2e.log 2>&1 &
+          HONCHO_PID=$!
+          trap 'kill $HONCHO_PID 2>/dev/null || true' EXIT
+          python .github/scripts/check_example_delivery.py
+
       - name: Upload logs artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: logs-${{ matrix.name }}
-          path: up.log
+          path: |
+            up.log
+            e2e.log
           if-no-files-found: ignore

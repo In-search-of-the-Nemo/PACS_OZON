@@ -1,0 +1,5 @@
+# Зависимости только для тестов, в рантайме не нужны.
+# Extra [client] добавляет requests + websocket-client — на них работает
+# Socket.IO-клиент, которым tests/check_example_delivery.py подключается
+# к backend так же, как это делает браузер.
+python-socketio[client]

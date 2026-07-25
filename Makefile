@@ -22,7 +22,7 @@ init: init_py init_npm
 
 init_py:
 	@echo "| VENV INIT |"
-	python3 -m venv venv
+	$(PYTHON) -m venv venv
 	./venv/bin/pip install --upgrade pip
 	./venv/bin/pip install -r requirements.txt
 

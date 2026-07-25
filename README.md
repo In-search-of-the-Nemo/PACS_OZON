@@ -1,4 +1,4 @@
-[![Version](https://img.shields.io/badge/version-v0.1.0-informational)](https://github.com/SPBUnited/serviz/actions/workflows/auto-semver.yml)
+[![Version](https://img.shields.io/badge/version-v0.2.0-informational)](https://github.com/SPBUnited/serviz/actions/workflows/auto-semver.yml)
 [![CI smoke (build + up)](https://github.com/SPbUnited/PAcmaCS/actions/workflows/ci-smoke.yaml/badge.svg?branch=fb4)](https://github.com/SPbUnited/PAcmaCS/actions/workflows/ci-smoke.yaml)
 
 # PACS - Programmatically Actionable Cybernetic Studio
