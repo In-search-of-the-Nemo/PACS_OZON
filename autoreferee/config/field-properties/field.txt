@@ -1,5 +1,0 @@
-fast_deceleration: 3.6
-slow_deceleration: 0.26
-switch_ratio: 0.67
-z_damping: 0.43
-xy_damping: 0.69

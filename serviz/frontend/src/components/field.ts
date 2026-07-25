@@ -429,7 +429,7 @@ const Field: Component = {
   },
 };
 
-export default Field;
+// export default Field;
 
 function convertCoordsToField(
   fieldSvg: SVGSVGElement,

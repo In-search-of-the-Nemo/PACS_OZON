@@ -1,27 +1,23 @@
-# Orchestrator
+# Оркестратор (запуск сервисов по Procfile)
 honcho
-watchdog
 
-# Common
-pyyaml
-attrs
-cattrs
-pytest
-
-# Transnet
-zmq
-protobuf
-protoletariat
-
-# serviz
+# Serviz backend (веб-сервер + WebSocket)
 Flask
 Flask-SocketIO
 python-socketio
 python-engineio
-gevent
-pyzmq
-PyYAML 
-eventlet
+simple-websocket
+
+# Transnet (декодирование SSL-протокола)
+protobuf
+cattrs
+
+# Общие
+pyyaml
 attrs
-#strategy_runner
-psutil
+
+# ZeroMQ — межпроцессная шина (ether) между serviz и transnet
+pyzmq
+
+# Только для перегенерации protobuf (transnet/build_proto.sh); в рантайме не нужен
+protoletariat
