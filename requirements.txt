@@ -8,16 +8,9 @@ python-socketio
 python-engineio
 simple-websocket
 
-# Transnet (декодирование SSL-протокола)
-protobuf
-cattrs
-
 # Общие
 pyyaml
 attrs
 
 # ZeroMQ — межпроцессная шина (ether) между serviz и transnet
 pyzmq
-
-# Только для перегенерации protobuf (transnet/build_proto.sh); в рантайме не нужен
-protoletariat

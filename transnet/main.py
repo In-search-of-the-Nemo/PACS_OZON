@@ -1,27 +1,14 @@
+
 from enum import Enum
-import threading
 from typing import Dict
-from attrs import define, field
+
 import zmq
+
 from thread_proxy_switch import ThreadProxySwitch
 import time
-import json
-
-from game_controller import game_controller_relay as gcr
-from common.tracker_client import TrackerClient
-from common.tracker_model import Team
-from grsim.client import GrSimClient
-from ether.signal_bus import SignalBus
 
 from argparse import ArgumentParser
 import yaml
-
-import pprint
-
-import multiprocessing as mp
-if mp.get_start_method(allow_none=True) != "fork":
-    mp.set_start_method("fork") # fix bad paths without docker
-
 
 parser = ArgumentParser()
 parser.add_argument("--config", default="config.yml")
@@ -33,10 +20,6 @@ if config["ether"]["api_version"] != 3:
     raise Exception("Only Ether v3 is supported")
 
 context = zmq.Context()
-
-s_draw = context.socket(zmq.PUB)
-s_draw.connect(config["ether"]["s_draw_sub_url"])
-
 
 s_signals = context.socket(zmq.SUB)
 s_signals.connect(config["ether"]["s_signals_pub_url"])
@@ -68,7 +51,7 @@ def ether_switch_handler(mode: PhantomCtrl):
     steer_send_cmd(s_draw_ctrl, mode.name)
 
 
-def setup_proxy(context: zmq.Context, signal_bus: SignalBus = None):
+def setup_proxy():
 
     s_signals_ctrl.bind(config["transnet"]["s_signals_ctrl_url"])
     s_draw_ctrl.bind(config["transnet"]["s_draw_ctrl_url"])
@@ -126,7 +109,6 @@ def setup_proxy(context: zmq.Context, signal_bus: SignalBus = None):
 
     print("Draw proxy UP")
 
-
     geometry_proxy = ThreadProxySwitch(
         zmq.XSUB, zmq.XSUB, zmq.XPUB, zmq.XPUB, ctrl_type=zmq.REP
     )
@@ -145,19 +127,11 @@ def setup_proxy(context: zmq.Context, signal_bus: SignalBus = None):
 
     ether_switch_handler(PhantomCtrl.ETHER)
 
-    # signal_bus.on("ether_disable",
-    #     lambda signal: s_ether_ctrl.send("PAUSE")
-    # )
-    # signal_bus.on("ether_enable",
-    #     lambda signal: s_ether_ctrl.send("RESUME")
-    # )
-
     print("Proxy UP")
 
 
 def proxy_ctrl_handler(signal: Dict):
     signal_type = signal["transnet"]
-    # print(signal)
 
     if signal_type == "ether_select":
         print("Ether select")
@@ -167,206 +141,19 @@ def proxy_ctrl_handler(signal: Dict):
         print("Phantom select")
         ether_switch_handler(PhantomCtrl.PHANTOM)
         return True
-    # if signal_type == "ether_enable":
-    #     print("Ether enable")
-    #     s_ether_ctrl.send("RESUME".encode())
-    #     print(s_ether_ctrl.recv_multipart())
-    #     s_ether_ctrl.send("RESUME".encode())
-    #     print(s_ether_ctrl.recv_multipart())
-    #     return True
-    # elif signal_type == "ether_disable":
-    #     print("Ether disable")
-    #     s_ether_ctrl.send("PAUSE".encode())
-    #     print(s_ether_ctrl.recv())
-    #     s_ether_ctrl.send("PAUSE".encode())
-    #     print(s_ether_ctrl.recv())
-    #     return True
-    # elif signal_type == "ether_terminate":
-    #     print("Ether disable")
-    #     s_ether_ctrl.send("TERMINATE".encode())
-    #     print(s_ether_ctrl.recv())
-    #     return True
-    # elif signal_type == "ether_stats":
-    #     print("Ether stats")
-    #     s_ether_ctrl.send("STATISTICS".encode())
-    #     print(s_ether_ctrl.recv_multipart())
-    #     return True
 
     return False
-
-
-from common.vision_model import Team
-from viscont import Viscont as vc
-
-
-@define
-class zmqVisionRelayTemplate:
-    context: zmq.Context = field(init=False)
-    relay: zmq.Socket = field(init=False)
-
-    def __attrs_post_init__(self):
-        self.context = zmq.Context()
-        self.relay = self.context.socket(zmq.PUB)
-        self.relay.bind(config["transnet"]["s_vision_fan_url"])
-        print("Vision relay init")
-
-    def send(self, raw_frame):
-        self.relay.send(raw_frame)
-
-
-@define
-class zmqTrackerRelayTemplate:
-    context: zmq.Context = field(init=False)
-    relay: zmq.Socket = field(init=False)
-
-    def __attrs_post_init__(self):
-        self.context = zmq.Context()
-        self.relay = self.context.socket(zmq.PUB)
-        self.relay.bind(config["transnet"]["s_tracker_fan_url"])
-        print("Tracker relay init on ", config["transnet"]["s_tracker_fan_url"])
-        self.relay.send_json({"Tracker relay init": True})
-
-    def send(self, processed_frame):
-        self.relay.send_json(processed_frame)
-        # self.relay.send_json({"Updated": True})
-        pass
-
-
-from common.tracker_model import (
-    TrackerWrapperPacket as TrackerWrapperPacketModel,
-)
-
-
-def convert_trackers_to_serviz(trackers: TrackerWrapperPacketModel):
-    layer_name = trackers.source_name + "_tracker_feed"
-    data = {
-        layer_name: {
-            "data": [],
-            "is_visible": True,
-        }
-    }
-
-    for ball in trackers.tracked_frame.balls:
-        data[layer_name]["data"].append(
-            {
-                "type": "ball",
-                "x": ball.pos.x * 1000,
-                "y": ball.pos.y * 1000,
-                "vx": ball.vel.x * 1000,
-                "vy": ball.vel.y * 1000,
-            }
-        )
-
-    for robot in trackers.tracked_frame.robots:
-        sprite_type = "ball"
-        # WARN: This is a hack due to proto enum field swap in new ssl packets
-        if robot.robot_id.team.value == Team.BLUE.value:
-            sprite_type = "robot_yel"
-        elif robot.robot_id.team.value == Team.YELLOW.value:
-            sprite_type = "robot_blu"
-        data[layer_name]["data"].append(
-            {
-                "type": sprite_type,
-                "robot_id": robot.robot_id.id,
-                "x": robot.pos.x * 1000,
-                "y": robot.pos.y * 1000,
-                "vx": robot.vel.x * 1000,
-                "vy": robot.vel.y * 1000,
-                "rotation": robot.orientation,
-            }
-        )
-    return data
-
-def format_message(data: dict) -> str:
-    lines = []
-    for _, layer in data.items():
-        for obj in layer["data"]:
-            if obj["type"] == "ball":
-                lines.append(
-                    f"BALL: x={round(obj['x'])}, y={round(obj['y'])}, "
-                    + (f"vx={round(obj['vx'])}, vy={round(obj['vy'])}" if "vx" in obj else "")
-                )
-            elif obj["type"] in ("robot_blu", "robot_yel"):
-                    line = (
-                        f"{obj['type'].upper():<10} {obj['robot_id']:>2} | "
-                        f"x={obj['x']:>5.0f}  y={obj['y']:>5.0f}  "
-                    )
-                    if "vx" in obj and "vy" in obj:
-                        line += f"vx={obj['vx']:>5.0f}  vy={obj['vy']:>5.0f}  "
-                    line += f"rot={obj['rotation']:>5.2f}"
-                    lines.append(line)
-
-            else:
-                lines.append(str(obj))
-    return "\n".join(lines)
-
 
 
 if __name__ == "__main__":
 
     print("Enter Transnet")
 
-    client = GrSimClient(zmq_relay_template=zmqVisionRelayTemplate)
-    tracker_client = TrackerClient(zmq_relay_template=zmqTrackerRelayTemplate)
-
-    vision = vc.SSLVision(client=client)
-    simControl = vc.SimControl(client=client)
-    robotControl = vc.RobotControl(client=vc.GrSimRobotControl(client=client))
-
-    # signal_bus = SignalBus("transnet", config["ether"]["s_signals_pub_url"])
-
-    setup_proxy(context)  # , signal_bus)
-
-    game_controller_relay = gcr.GameControllerRelay(
-        game_controller_fan_url=config["transnet"]["s_game_controller_fan_url"],
-        s_signals_url=config["ether"]["s_signals_sub_url"],
-    )
-
-    time.sleep(2)
-
-    tracker_client.init()
-    game_controller_relay.init()
-
-    s_telemetry = context.socket(zmq.PUB)
-    s_telemetry.connect(config["ether"]["s_telemetry_sub_url"])
-
-    s_geometry = context.socket(zmq.PUB)
-    s_geometry.connect(config["ether"]["s_geometry_sub_url"])
-
-    last_frontend_frame_at = 0.0
-    FRONTEND_FRAME_INTERVAL = 1 / 60
+    setup_proxy()
 
     print("Transnet ready")
     while True:
-        # only drawing and sending to UI
-        now = time.monotonic()
-        if now - last_frontend_frame_at >= FRONTEND_FRAME_INTERVAL:
-            last_frontend_frame_at = now
-
-            # Process vision
-            detection = client.get_detection()
-            vision.update_vision(detection)
-            field_info = vision.get_field_info()
-            data = {"vision_feed": {"data": field_info, "is_visible": True}}
-            s_draw.send_json(data)
-
-            field_geometry = detection.geometry
-            if field_geometry is not None:
-                s_geometry.send_json(field_geometry.__dict__)
-
-            s_telemetry.send_json({list(data.keys())[0]: format_message(data)})
-
-            trackers = tracker_client.get_detections()
-            for tracker_key in trackers:
-                data = convert_trackers_to_serviz(trackers[tracker_key])
-                s_draw.send_json(data)
-
-                data_str = format_message(data)
-                s_telemetry.send_json({list(data.keys())[0]: data_str})
-
-
-        for i in range(100):
-            # Process incoming signals
+        for _ in range(100):
             try:
                 socks = dict(poller.poll(timeout=0))
             except KeyboardInterrupt:
@@ -377,12 +164,7 @@ if __name__ == "__main__":
 
             if s_signals in socks:
                 signal = s_signals.recv_json()
-                # print(signal)
-                if (
-                        simControl.signal_handler(signal) or 
-                        robotControl.signal_handler(signal) or 
-                        proxy_ctrl_handler(signal)
-                    ):
+                if proxy_ctrl_handler(signal):
                     continue
 
                 print("Invalid signal: ", signal)
